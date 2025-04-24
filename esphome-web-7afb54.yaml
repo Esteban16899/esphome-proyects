@@ -1,0 +1,193 @@
+esphome:
+  name: invernadero
+
+esp32:
+  board: nodemcu-32s
+  
+i2c:
+  - id: bus_a
+    sda: GPIO26
+    scl: GPIO25
+    scan: false
+    #frequency: 100kHz
+
+# Switches de las valvulas de GPIO 18 19 25 26 27 14 12 13 02 15
+
+output:
+  - platform: ledc
+    pin: GPIO12
+    id: motor_forward_pin
+    inverted: false
+    
+  - platform: ledc
+    pin: GPIO13
+    id: motor_reverse_pin
+    inverted: false
+    
+  - platform: gpio
+    pin: GPIO23
+    id: ms_power
+    inverted: true
+
+switch:
+  - platform: gpio
+    pin: GPIO16
+    inverted: true
+    id: switch_1
+    name: "Luz"
+    # Luz
+    
+  - platform: gpio
+    pin: GPIO17
+    inverted: true
+    id: switch_2
+    name: "Calefactor"
+    # Calefacción
+
+  - platform: gpio
+    pin: GPIO18
+    inverted: true
+    id: switch_3
+    name: "Ventilación"
+    # Ventilación
+    
+  - platform: gpio
+    pin: GPIO05
+    inverted: true
+    id: switch_4
+    name: "Humidificador"
+    # Humedad 
+    
+  - platform: gpio
+    pin: GPIO19
+    inverted: true
+    id: switch_5
+    name: "Valvula Riego"
+    # Valvula
+
+#TEST PIN
+  - platform: gpio
+    pin: GPIO21
+    inverted: true
+    id: switch_6
+    name: "Valvula Riego GPIO21"
+
+#TEST PIN
+  - platform: gpio
+    pin: GPIO4
+    inverted: true
+    id: switch_7
+    name: "Valvula Riego GPIO4"
+    
+    
+
+
+# Puente H
+fan:
+  - platform: hbridge
+    id: my_fan
+    name: "Living Room Fan"
+    pin_a: motor_forward_pin
+    pin_b: motor_reverse_pin
+    # enable_pin: motor_enable
+    speed_count: 1
+    decay_mode: fast   # slow decay mode (coasting) or fast decay (braking).
+
+sensor:
+#DHT - a remover
+#  - platform: dht
+#    pin: GPIO21
+#    temperature:
+#      name: "Temperatura DHT"
+#    humidity:
+#      name: "Humedad DHT"
+#    update_interval: 60s
+#    model: DHT11
+
+#Sentor Temp ir
+  - platform: mlx90614
+    ambient:
+      name: "Temp IR Ambiente"
+      id: ir_amb_temp
+    object:
+      name: "Temp IR Objeto"
+      id: ir_obj_temp
+      emissivity: 0.98
+        
+  - platform: aht10
+    variant: AHT10
+    temperature:
+      name: "Temperatura Exterior"
+      id: aht10_ext_temp
+    humidity:
+      name: "Humedad Exterior"
+      id: aht10_ext_hum
+    address: 0x39
+    update_interval: 60s
+
+#HTU21 
+  - platform: htu21d
+    i2c_id: bus_a
+    update_interval: 60s
+    #model: si7021
+    temperature:
+      name: "Temperatura HTU21"
+      id: htu21_temp
+    humidity:
+      name: "Humedad HTU21"
+      id: htu21_hum
+
+# Sensor Luz ambiente
+  - platform: adc
+    pin: A0
+    name: "Luminosidad TEMT6000"
+    device_class: illuminance
+    unit_of_measurement: lx
+    filters:
+      - median:
+          window_size: 7
+          send_every: 4
+          send_first_at: 1
+      - lambda: |-
+          return (x / 10000.0) * 2000000.0;
+
+  - platform: adc
+    pin: GPIO39
+    name: "Humedad Tierra"
+    update_interval: 60s
+    unit_of_measurement: "%"
+    filters:
+    - median:
+        window_size: 7
+        send_every: 4
+        send_first_at: 1
+    - calibrate_linear:
+        - 0.44 -> 0.00
+        - 0.85 -> 100.00
+    - lambda: if (x < 1) return 0; else return (x);
+    accuracy_decimals: 0
+
+button:
+  - platform: restart
+    id: invernadero_restart
+    name: "Invernadero Restart"
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esphome-Web-Invernadero"
+    password: "estimaru9901"
+
+captive_portal:
