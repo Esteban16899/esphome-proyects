@@ -3,7 +3,15 @@ esphome:
 
 esp32:
   board: nodemcu-32s
-  
+
+substitutions:
+  filtro_median: |-
+    - median:
+        window_size: 12
+        send_every: 6
+        send_first_at: 1
+  intervalo_sensores: 30s
+
 i2c:
   - id: bus_a
     sda: GPIO26
@@ -94,48 +102,63 @@ fan:
     decay_mode: fast   # slow decay mode (coasting) or fast decay (braking).
 
 sensor:
-#DHT - a remover
-#  - platform: dht
-#    pin: GPIO21
-#    temperature:
-#      name: "Temperatura DHT"
-#    humidity:
-#      name: "Humedad DHT"
-#    update_interval: 60s
-#    model: DHT11
 
 #Sentor Temp ir
   - platform: mlx90614
     ambient:
-      name: "Temp IR Ambiente"
+      name: Temp IR Ambiente
       id: ir_amb_temp
+      filters: &filtro_sensores
+        - median:
+            window_size: 12
+            send_every: 6
+            send_first_at: 1
     object:
-      name: "Temp IR Objeto"
+      name: Temp IR Objeto
       id: ir_obj_temp
+      filters: *filtro_sensores
       emissivity: 0.98
+    update_interval: ${intervalo_sensores}
         
   - platform: aht10
     variant: AHT10
     temperature:
       name: "Temperatura Exterior"
       id: aht10_ext_temp
+      filters: *filtro_sensores
     humidity:
       name: "Humedad Exterior"
       id: aht10_ext_hum
+      filters: *filtro_sensores
     address: 0x39
-    update_interval: 60s
+    update_interval: ${intervalo_sensores}
+
+  - platform: aht10
+    variant: AHT10
+    temperature:
+      name: "Temperatura Interior"
+      id: aht10_int_temp
+      filters: *filtro_sensores
+    humidity:
+      name: "Humedad Interior"
+      id: aht10_int_hum
+      filters: *filtro_sensores
+    address: 0x38
+    update_interval: ${intervalo_sensores}
 
 #HTU21 
   - platform: htu21d
     i2c_id: bus_a
-    update_interval: 60s
+    update_interval: ${intervalo_sensores}
     #model: si7021
     temperature:
       name: "Temperatura HTU21"
       id: htu21_temp
+      filters: *filtro_sensores
     humidity:
       name: "Humedad HTU21"
       id: htu21_hum
+      filters: *filtro_sensores
 
 # Sensor Luz ambiente
   - platform: adc
@@ -143,29 +166,31 @@ sensor:
     name: "Luminosidad TEMT6000"
     device_class: illuminance
     unit_of_measurement: lx
+    update_interval: ${intervalo_sensores}
     filters:
       - median:
-          window_size: 7
-          send_every: 4
+          window_size: 20
+          send_every: 5
           send_first_at: 1
       - lambda: |-
           return (x / 10000.0) * 2000000.0;
 
   - platform: adc
     pin: GPIO39
+    attenuation: 11db
     name: "Humedad Tierra"
-    update_interval: 60s
+    update_interval: ${intervalo_sensores}
     unit_of_measurement: "%"
     filters:
-    - median:
-        window_size: 7
-        send_every: 4
-        send_first_at: 1
-    - calibrate_linear:
-        - 0.85 -> 0.00
-        - 2.7 -> 100.00
-    - lambda: if (x < 1) return 0; else return (x);
-    accuracy_decimals: 0
+      - median:
+          window_size: 12
+          send_every: 6
+          send_first_at: 1
+      - calibrate_linear:
+          - 0.85 -> 100.00
+          - 2.7 -> 0.00
+      - lambda: if (x < 1) return 0; else return (x);
+    accuracy_decimals: 1
 
 button:
   - platform: restart
@@ -174,6 +199,7 @@ button:
 
 # Enable logging
 logger:
+  level: DEBUG  # Or INFO, WARN, ERROR, FATAL
 
 # Enable Home Assistant API
 api:
